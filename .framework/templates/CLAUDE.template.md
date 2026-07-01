@@ -28,6 +28,8 @@ This repo has vendored `org-framework` into `.framework/`. Before doing anything
 
 This is a **session-start gate**, not a per-message requirement — once read, these don't need to be re-read on every turn within the same session, only at session start and after a genuine context reset. Full rationale lives in `.framework/AGENT.md` Section 1.
 
+**This gate applies to the FIRST message of every session, with no exceptions based on message content or phrasing.** It fires unconditionally — whether the first message is a feature request, a bug report, a question, or a simple greeting. The presence of this `CLAUDE.md` at the repo root is itself the trigger; no judgment about the nature of the first message is required or permitted.
+
 If `PROJECT_KNOWLEDGE.md` or `DECISIONS.md` do not exist yet at this repo's root, instantiate them from `.framework/templates/` before proceeding with any substantive work — an unfilled `stack:` declaration is treated as a foundational gap per `.framework/AGENT.md` Section 4.2, not a detail to defer.
 
 This applies to every developer using an AI agent on this repository, every session, regardless of who they are or what they're building — see `.framework/AGENT.md` Section 6.

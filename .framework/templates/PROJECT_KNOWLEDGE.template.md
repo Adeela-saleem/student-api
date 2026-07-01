@@ -4,10 +4,16 @@
   Instantiation instructions:
   - Copy this file to the project root as `PROJECT_KNOWLEDGE.md`
     (outside `.framework/`, alongside `DECISIONS.md`).
-  - Fill in every bracketed placeholder. Do not leave the `stack:`
-    block partially filled — per AGENT.md Section 4.2, a missing or
-    incomplete stack declaration is treated as a foundational gap,
-    not a detail to fill in "later."
+  - The `stack:` block below is a reference/override, not a mandatory
+    first fill. The agent auto-detects stack from project files at
+    session start (per AGENT.md Section 4.2) and uses this block to
+    add specificity or override detected values. Fill it in when the
+    auto-detected stack needs clarification, version-pinning, or when
+    you want to explicitly record architectural choices that project
+    files alone cannot express.
+  - Per AGENT.md Section 4.2, a missing or empty `stack:` block is
+    a foundational gap the agent will proactively offer to fill from
+    its detection — it is not a blocker on starting work.
   - This file is a single, project-root file per AGENT.md Section 4.4
     — do not split it into per-stack files or subfolders without
     first logging that split as a foundational-tier decision in
@@ -23,14 +29,17 @@
 
 ---
 
-## Stack Declaration (mandatory — authoritative source of truth)
+## Stack Declaration (reference/override — auto-detection runs first)
 
-> This block is read by every agent session per `AGENT.md` Section 4.2
-> and routes which stack-specific guidance and Applied Examples apply.
-> File-based auto-detection (`package.json`, `requirements.txt`, etc.)
-> runs only as a verification check against this block — never as the
-> primary mechanism. If they disagree, that discrepancy must be
-> flagged and resolved explicitly, not silently.
+> The agent auto-detects stack from project files (`pom.xml`,
+> `package.json`, `requirements.txt`, `go.mod`, etc.) at session start
+> per `AGENT.md` Section 4.2. This block is the **reference and override**:
+> use it to add specificity the files can't express (version pins, layout
+> conventions, explicit architectural choices), to record the canonical
+> agreed stack, or to override detection when detection would be wrong.
+> A missing block is not a blocker — the agent will offer to fill it from
+> detection. A block that conflicts with project files will be flagged for
+> resolution rather than silently trusted.
 
 ```
 stack:

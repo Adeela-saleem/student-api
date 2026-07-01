@@ -18,6 +18,12 @@ following, in this exact order, once at the start of a session — and again
 if the session's context is reset or compacted — then proceed normally for
 the rest of that session without re-reading on every subsequent message.
 
+**Trigger:** the presence of `CLAUDE.md` at the repo root is itself the
+trigger. This gate fires at the FIRST message of every session, with no
+exceptions based on message content or phrasing — whether the first message
+is a feature request, a bug report, a question, or a simple greeting. No
+judgment about the nature of the first message is required or permitted.
+
 1. `.framework/AGENT.md` — this file.
 2. The relevant files in `.framework/skills/` — at minimum `core.md` and
    `language-agnostic-behavior.md` always; others as routed by the work
@@ -48,10 +54,10 @@ assume the prior reads are still in its working context.
 **What "before any response" means in practice:** no code, no
 recommendation, no architectural opinion, no file edit — nothing
 substantive is produced until this gate has been satisfied for the
-current session. A session that begins with a trivial question
-("what does this function do?") may answer informally, but the moment
-the conversation moves toward producing or recommending a change, the
-gate must already be satisfied.
+current session. This includes trivial first messages (\"hi\", \"what
+does this do?\") — the gate runs first, then the question is answered.
+There are no exceptions based on the phrasing or apparent simplicity of
+the first message.
 
 ---
 
@@ -128,30 +134,61 @@ Load only what's relevant to the task at hand — loading all ten skill
 files for every session is unnecessary overhead; the table above exists
 so routing is deliberate rather than guessed.
 
-### 4.2 — Stack routing: declared, not purely inferred
+### 4.2 — Stack routing: auto-detection first, declared block as override
 
-`PROJECT_KNOWLEDGE.md` contains a mandatory, explicit `stack:`
-declaration block (see
-`templates/PROJECT_KNOWLEDGE.template.md`). **This declaration is the
-authoritative source of truth** for which stack-specific guidance,
-idiomatic conventions, and Applied Examples apply.
+At session start the agent **auto-detects the stack from project files**
+(`package.json`, `requirements.txt`, `Cargo.toml`, `pom.xml`, `go.mod`,
+`pyproject.toml`, `Gemfile`, `build.gradle`, `*.csproj`, etc.) before
+reading the `stack:` declaration block in `PROJECT_KNOWLEDGE.md`.
 
-Auto-detection from project files (`package.json`, `requirements.txt`,
-`Cargo.toml`, `pom.xml`, etc.) still runs, but **only as a verification
-check against the declared stack** — never as the primary routing
-mechanism. If auto-detection and the declared stack disagree (e.g. the
-declaration says `backend: python-fastapi` but no FastAPI dependency is
-present, or a `package.json` exists alongside a declaration that
-mentions no JS/TS stack at all), the agent must flag the discrepancy
-explicitly to the user and ask, rather than silently trusting one source
-over the other.
+**Priority order:**
 
-**A `PROJECT_KNOWLEDGE.md` with no `stack:` block declared is itself a
-foundational gap.** Do not silently proceed as if a stack were obvious
-from file inspection alone. Raise it, and route the project toward
-filling in the declaration (via the `architect` persona / `decide`
-command if establishing it for the first time is itself a foundational
-decision for that project) before producing stack-flavored output.
+1. **Auto-detect from project files** — primary source. This runs first,
+   at session start, regardless of what the declared block says.
+2. **`stack:` declaration block in `PROJECT_KNOWLEDGE.md`** — treated as
+   a reference/override, not as the mandatory first source of truth. If it
+   exists and agrees with auto-detection, proceed. If it adds specificity
+   that files alone can't express (e.g. `backend: python-fastapi` vs.
+   just `python`), incorporate that specificity.
+3. **Declared block overrides detection** only when it contains explicit
+   information that project files cannot: version pins, layout conventions,
+   deliberate architectural choices. If the declared block says something
+   that contradicts what the project files show, flag the discrepancy
+   explicitly (see conflict rule below).
+
+**When auto-detection is ambiguous:** if two or more conflicting
+stack signals are present simultaneously (e.g. both `pom.xml` and
+`package.json` with no clear boundary between them, or `requirements.txt`
+alongside `go.mod` at the same directory level), the agent **must ask**
+rather than guess. Never silently pick one signal over another in an
+ambiguous case. State what was found and ask the user to clarify which
+applies (or whether both apply in a polyglot setup).
+
+**If detection succeeds and no `stack:` block exists in
+`PROJECT_KNOWLEDGE.md`:** proceed using the detected stack. Note the gap
+proactively and offer to fill in the `stack:` block in the same turn —
+this is a foundational gap, but a fixable one, not a blocker (see
+Section 4 gap-handling below).
+
+**If detection succeeds but conflicts with the declared block:** flag the
+discrepancy explicitly to the user and ask for resolution rather than
+silently trusting either source. State both what was detected and what
+was declared, so the user can correct whichever is stale.
+
+**A `PROJECT_KNOWLEDGE.md` with no `stack:` block** is treated as a
+foundational gap; proactively offer to fill it using the detected stack
+(see Section 4 below). Do not block work waiting for it — offer to fix
+it in the same turn and proceed with the detected stack unless the user
+asks to stop.
+
+**Proactive gap-fix at session start:** if the agent detects a foundational
+gap (no `stack:` block, missing `PROJECT_KNOWLEDGE.md`, unfilled placeholders
+in `DECISIONS.md`) at the end of the session-start gate read, it must
+**proactively offer to fix the gap in the same turn** — not merely flag it
+and wait. The offer should be specific: state exactly what is missing, what
+the agent would fill in based on detection, and ask for a yes/no confirmation
+before writing. Do not block the user's actual question while doing this —
+answer the question and append the offer at the end of the same response.
 
 ### 4.3 — Tiering: foundational vs. feature-level
 
@@ -227,6 +264,49 @@ if there is any reason to suspect the vendored copy may be stale (e.g.
 the user mentions a recent framework update, or behavior described here
 doesn't match what's actually present in `.framework/`) — but should not
 treat a routine session as requiring a version check by default.
+
+### 5.1 — Two command layers (both present, neither replaces the other)
+
+This framework ships **two parallel command layers** that must both be
+present and kept in sync after a `sync.sh` run:
+
+**Layer 1 — `.framework/commands/`** (source of truth, agent-read)
+The canonical command files vendored inside `.framework/`. Every agent
+session that supports reading markdown files (Claude Code CLI, Cursor,
+Copilot, Windsurf, or any other tool) reads these directly. These files
+contain the full command logic. They must not be deleted, moved, or
+modified by the consumer project.
+
+**Layer 2 — `.claude/commands/`** (native slash commands, thin wrappers)
+Populated by `sync.sh` at first sync. These are minimal wrapper files
+that point back to their Layer 1 counterpart as the source of truth.
+They exist so that tools with a native slash-command picker (Claude Code
+VS Code extension, Claude Code terminal `/` menu) discover and expose
+the framework's commands in their interactive menus without requiring the
+user to know the `.framework/` path. The wrappers contain no logic of
+their own — they load the corresponding `.framework/commands/*.md` file
+and delegate entirely.
+
+**Wrapper format used (`.claude/commands/<name>.md`):**
+
+```markdown
+---
+description: org-framework /<name> — delegates to .framework/commands/<name>.md
+---
+
+Read and execute the instructions in `.framework/commands/<name>.md`,
+then proceed as directed there.
+$ARGUMENTS
+```
+
+Template versions of these wrappers live in
+`templates/dot-claude-commands/` so a consumer repo can inspect or
+regenerate them without re-running `sync.sh`.
+
+**When `.claude/commands/` is absent (older consumer repos or tools that
+don't support the directory):** the agent continues to use Layer 1
+directly with no behavioral change. Layer 2 is an enhancement, not a
+dependency.
 
 ---
 

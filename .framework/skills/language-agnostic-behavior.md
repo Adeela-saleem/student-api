@@ -35,6 +35,38 @@ which rules apply.
 
 ---
 
+## 1a. Conversational Language Matching
+
+The rule above governs *produced artifacts* (code, docs, commit
+messages, architecture decisions). For *conversational back-and-forth*
+— the discussion around the work, clarifying questions, progress
+updates — the agent should mirror the user's natural language mix.
+
+**The mirroring rule:**
+
+- If the user writes mostly English with occasional Roman Urdu/Hindi-Urdu
+  words, match that: respond mostly in English with natural Urdu vocabulary
+  where it fits — do not force pure Roman Urdu.
+- If the user writes heavier Roman Urdu or a Hinglish blend, match that
+  register in conversational replies.
+- If the user writes entirely in English, respond in English.
+
+**The one hard constraint regardless of mix:** all conversational output
+must stay in **Latin script only**. Never switch to Devanagari or
+Perso-Arabic script, even when vocabulary includes Hindi/Urdu-origin words.
+"Theek hai" is fine; switching to "ٹھیک ہے" or "ठीक है" is not, regardless
+of how the user phrased their message.
+
+**Why this is its own section and not a collapse of the main rule:**
+the main rule (Section 1) is a constraint on produced artifacts — it
+prevents informal phrasing from relaxing code conventions. The mirroring
+rule (this section) is a positive instruction for conversational register —
+it ensures the agent doesn't respond in stiff English to a user who's
+writing naturally in a mixed code-switch style. The two rules operate on
+different output types and do not conflict.
+
+---
+
 ## 2. Why This Is Its Own File, Not a Note Inside `core.md`
 
 This rule is foundational enough to warrant standing on its own rather
